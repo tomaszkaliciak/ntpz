@@ -5,19 +5,14 @@ const os = std.os.linux;
 const PF_INET = 2;
 const SOCK_DGRAM = 2;
 
-// li_vn_mode: u8,
-// stratum: u8,
-// poll: i8,
-// precision: i8,
-// root_delay: u32,
-// root_dispersion: u32,
-// reference_id: u32,
-// reference_timestamp: u64,
-// origin_timestamp: u64,
-// receive_timestamp: u64,
-// transmit_timestamp: u64,
+const NTP_UNIX_OFFSET_IN_NS = 2208988800000000000;
 
-const NtpPacket = extern struct { li_vn_mode: u8, stratum: u8, poll: u8, precision: u8, rootDelay: u32, rootDispersion: u32, refId: u32, refTm_s: u32, refTm_f: u32, origTm_s: u32, origTm_f: u32, rxTm_s: u32, rxTm_f: u32, txTm_s: u32, txTm_f: u32 };
+// .li_vn_mode = 0x1B,  // LI = 0, VN = 4, Mode = 3 (client)
+// LI (Leap Indicator) = 0 (no notif)
+// VN (Version Number) = 4 (NTPv4)
+// Mode = 3 (client mode)
+
+const NtpPacket = extern struct { li_vn_mode: u8, stratum: u8, poll: u8, precision: i8, rootDelay: u32, rootDispersion: u32, referenceId: u32, referenceTime: u64, originTime: u64, receiveTime: u64, transmitTime: u64 };
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
