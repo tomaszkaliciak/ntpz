@@ -8,33 +8,17 @@ const SOCK_DGRAM = 2;
 const NTP_UNIX_OFFSET_IN_NS = 2208988800000000000;
 
 const NtpPacket = extern struct {
-    li_vn_mode: u8,
-    stratum: u8,
-    pollInterval: u8,
-    precision: i8,
-    rootDelay: u32,
-    rootDispersion: u32,
-    referenceId: u32,
-    referenceTime: u64,
-    originTime: u64,
-    receiveTime: u64,
-    transmitTime: u64,
-
-    fn init() NtpPacket {
-        return NtpPacket{
-            .li_vn_mode = 0,
-            .stratum = 0,
-            .pollInterval = 0,
-            .precision = 0,
-            .rootDelay = 0,
-            .rootDispersion = 0,
-            .referenceId = 0,
-            .referenceTime = 0,
-            .originTime = 0,
-            .receiveTime = 0,
-            .transmitTime = 0,
-        };
-    }
+    li_vn_mode: u8 = 0,
+    stratum: u8 = 0,
+    pollInterval: u8 = 0,
+    precision: i8 = 0,
+    rootDelay: u32 = 0,
+    rootDispersion: u32 = 0,
+    referenceId: u32 = 0,
+    referenceTime: u64 = 0,
+    originTime: u64 = 0,
+    receiveTime: u64 = 0,
+    transmitTime: u64 = 0,
 };
 
 pub fn main() !void {
@@ -52,9 +36,10 @@ pub fn main() !void {
     const now: u64 = @intCast(std.time.nanoTimestamp());
     const ntpTimestamp: u64 = now + NTP_UNIX_OFFSET_IN_NS;
 
-    var ntpClientPacket = NtpPacket.init();
-    ntpClientPacket.li_vn_mode = 0b00_100_011; // LI (Leap Indicator) = 0 (no notif), VN (Version Number) = 4 (NTPv4), Mode = 3 (client mode)
-    ntpClientPacket.transmitTime = @byteSwap(ntpTimestamp);
+    const ntpClientPacket = NtpPacket{
+        .li_vn_mode = 0b00_100_011, // LI (Leap Indicator) = 0 (no notif), VN (Version Number) = 4 (NTPv4), Mode = 3 (client mode)
+        .transmitTime = @byteSwap(ntpTimestamp),
+    };
 
     const firstAddr = addrs[0].any;
     const firstAddrLen = addrs[0].getOsSockLen();
