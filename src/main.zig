@@ -58,8 +58,22 @@ pub fn main() !void {
 
     const sockfd: i32 = @intCast(os.socket(PF_INET, SOCK_DGRAM, 0));
 
+    const addr = std.net.Address.initIp4(.{ 0, 0, 0, 0 }, 1996);
+    _ = os.bind(sockfd, &addr.any, addr.getOsSockLen());
+
     const firstAddr = addrs[0].any;
     const firstAddrLen = addrs[0].getOsSockLen();
 
     _ = os.sendto(sockfd, &buffer, 48, 0, &firstAddr, firstAddrLen);
+
+    var buffer2: [48]u8 = undefined;
+    var srcAddr: net.Address = undefined;
+    var srcAddrLen: os.socklen_t = @sizeOf(net.Address);
+
+    const recv_result = os.recvfrom(sockfd, &buffer2, 48, 0, &srcAddr.any, &srcAddrLen);
+
+    std.debug.print("Received {}: {x}\n", .{
+        recv_result,
+        buffer2[0..recv_result],
+    });
 }
