@@ -85,7 +85,7 @@ pub fn main() !void {
         buffer_in[0..recv_result],
     });
 
-    const packetFromServer = parsePacket(buffer_in);
+    const packetFromServer: NtpPacket = parsePacket(buffer_in);
 
     std.debug.print("Received li_vn_mode {b}\n", .{packetFromServer.li_vn_mode});
     std.debug.print("Received stratum {}\n", .{packetFromServer.stratum});
@@ -113,6 +113,16 @@ pub fn main() !void {
 
     const transmitTime = parseNtpTimestamp(packetFromServer.transmitTime);
     std.debug.print("Received transmitTime {}s {} ms\n", .{ transmitTime.seconds, u32SecondFranctionToMs(@floatFromInt(transmitTime.fraction)) });
+
+    const receiveTimeInEpoch = receiveTime.seconds - NTP_UNIX_OFFSET_IN_S;
+    printTimestamp(receiveTimeInEpoch);
+}
+
+fn printTimestamp(cTime: c.time_t) void {
+    var buf: [200]u8 = undefined;
+    const tm = c.gmtime(&cTime);
+    _ = c.strftime(&buf, 200, "%a %b %e %Y %H:%M:%S %Z", tm);
+    std.debug.print("Server received msg at {s} \n", .{buf});
 }
 
 fn u16SecondFranctionToMs(fraction: f32) f32 {
@@ -151,8 +161,6 @@ fn parsePacket(payload: [48]u8) NtpPacket {
     packet.receiveTime = std.mem.readInt(u64, payload[32..40], std.builtin.Endian.big);
     packet.transmitTime = std.mem.readInt(u64, payload[40..], std.builtin.Endian.big);
     return packet;
-
-    // 0011 1010
 }
 
 // 0000 0010 0010 0011
