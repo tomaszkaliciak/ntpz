@@ -1,6 +1,7 @@
 const std = @import("std");
 const net = std.net;
 const os = std.os.linux;
+const ntp = @import("ntp.zig");
 
 const c = @cImport({
     @cInclude("time.h");
@@ -14,23 +15,7 @@ const NTP_UNIX_OFFSET_IN_S = 2208988800;
 const U16_SECOND_FRACTION_IN_MS = 0.01525878;
 const U32_SECOND_FRACTION_IN_MS = 0.00000023283064365386962890625;
 
-const NtpShortFormat = extern struct { seconds: u16 = 0, fraction: u16 = 0 };
-
-const NtpTimestampFormat = extern struct { seconds: u32 = 0, fraction: u32 = 0 };
-
-const NtpPacket = extern struct {
-    li_vn_mode: u8 = 0,
-    stratum: u8 = 0,
-    pollInterval: u8 = 0,
-    precision: i8 = 0,
-    rootDelay: u32 = 0,
-    rootDispersion: u32 = 0,
-    referenceId: u32 = 0,
-    referenceTime: u64 = 0,
-    originTime: u64 = 0,
-    receiveTime: u64 = 0,
-    transmitTime: u64 = 0,
-};
+//timedatectl timesync-status
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -48,24 +33,23 @@ pub fn main() !void {
         std.debug.print("{}\n", .{addr});
     }
 
-    const now: u64 = @intCast(std.time.timestamp()); // unix time in [s]
+    const now_before_msg = std.time.nanoTimestamp();
 
-    const ntpTimeSeconds: u64 = now + NTP_UNIX_OFFSET_IN_S;
-
+    const ntpTimeSecondsBeforeMsg: u64 = @as(u64, @intCast(@divFloor(now_before_msg, std.time.ns_per_s))) + NTP_UNIX_OFFSET_IN_S;
     // NTPTime.fraction = 1 ==> 1/(2^32)s == 0.2ns
-    // let's dont think about it for now
-    const ntpTimeFraction: u64 = 0;
 
-    const ntpTimeStamp: u64 = ntpTimeSeconds << 32 | ntpTimeFraction;
+    const nsecBeforeMsg: u64 = @intCast(@rem(now_before_msg, std.time.ns_per_s));
+    const fracBeforeMsg: u64 = @truncate((nsecBeforeMsg << 32) / std.time.ns_per_s);
+    const ntpTimeStampBeforeMsg: u64 = ntpTimeSecondsBeforeMsg << 32 | fracBeforeMsg;
 
-    const ntpClientPacket = NtpPacket{
+    const ntpClientPacket = ntp.Packet{
         .li_vn_mode = 0b00_100_011, // LI (Leap Indicator) = 0 (no notif), VN (Version Number) = 4 (NTPv4), Mode = 3 (client mode)
-        .transmitTime = @byteSwap(ntpTimeStamp),
+        .transmitTime = @byteSwap(ntpTimeStampBeforeMsg),
     };
 
-    const ntpPacketInBytes: [48]u8 = @bitCast(ntpClientPacket);
+    const PacketInBytes: [48]u8 = @bitCast(ntpClientPacket);
     var buffer_out = std.mem.zeroes([48]u8);
-    std.mem.copyForwards(u8, &buffer_out, &ntpPacketInBytes);
+    std.mem.copyForwards(u8, &buffer_out, &PacketInBytes);
 
     const sockfd: i32 = @intCast(os.socket(PF_INET, SOCK_DGRAM, 0));
 
@@ -79,13 +63,14 @@ pub fn main() !void {
     var srcAddrLen: os.socklen_t = @sizeOf(net.Address);
 
     const recv_result = os.recvfrom(sockfd, &buffer_in, 48, 0, &srcAddr.any, &srcAddrLen);
+    // const now_after_msg = std.time.nanoTimestamp();
 
     std.debug.print("Received {}: {x}\n", .{
         recv_result,
         buffer_in[0..recv_result],
     });
 
-    const packetFromServer: NtpPacket = parsePacket(buffer_in);
+    const packetFromServer: ntp.Packet = parsePacket(buffer_in);
 
     std.debug.print("Received li_vn_mode {b}\n", .{packetFromServer.li_vn_mode});
     std.debug.print("Received stratum {}\n", .{packetFromServer.stratum});
@@ -116,8 +101,16 @@ pub fn main() !void {
 
     const receiveTimeInEpoch = receiveTime.seconds - NTP_UNIX_OFFSET_IN_S;
     printTimestamp(receiveTimeInEpoch);
-}
 
+    // const ntpTimeSecondsAfterMsg: u64 = @as(u64, @intCast(@divFloor(now_after_msg, std.time.ns_per_s))) + NTP_UNIX_OFFSET_IN_S;
+    // const nsecAfterMsg: u64 = @intCast(@rem(now_before_msg, std.time.ns_per_s));
+    // const fracAfterMsg: u64 = @truncate((nsecAfterMsg << 32) / std.time.ns_per_s);
+    // const ntpTimeStampAfterMsg: u64 = ntpTimeSecondsAfterMsg << 32 | fracAfterMsg;
+    // const t4 = parseNtpTimestamp(ntpTimeStampAfterMsg);
+
+    // roundtrip delay = T(ABA) = (T4-T1) - (T3-T2)
+    // result.delay = ;
+}
 fn printTimestamp(cTime: c.time_t) void {
     var buf: [200]u8 = undefined;
     const tm = c.gmtime(&cTime);
@@ -133,22 +126,22 @@ fn u32SecondFranctionToMs(fraction: f32) f32 {
     return U32_SECOND_FRACTION_IN_MS * fraction;
 }
 
-fn parseNtpShort(payload: u32) NtpShortFormat {
-    var ntpTime = NtpShortFormat{};
+fn parseNtpShort(payload: u32) ntp.ShortTimestamp {
+    var ntpTime = ntp.ShortTimestamp{};
     ntpTime.seconds = @intCast(payload >> 16);
     ntpTime.fraction = @intCast(payload & 0xFFFF);
     return ntpTime;
 }
 
-fn parseNtpTimestamp(payload: u64) NtpTimestampFormat {
-    var ntpTime = NtpTimestampFormat{};
+fn parseNtpTimestamp(payload: u64) ntp.LongTimestamp {
+    var ntpTime = ntp.LongTimestamp{};
     ntpTime.seconds = @intCast(payload >> 32);
     ntpTime.fraction = @intCast(payload & 0xFFFFFFFF);
     return ntpTime;
 }
 
-fn parsePacket(payload: [48]u8) NtpPacket {
-    var packet = NtpPacket{};
+fn parsePacket(payload: [48]u8) ntp.Packet {
+    var packet = ntp.Packet{};
     packet.li_vn_mode = payload[0];
     packet.stratum = payload[1];
     packet.pollInterval = payload[2]; // OK - 2 = 8s? check format
