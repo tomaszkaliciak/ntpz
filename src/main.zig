@@ -59,6 +59,9 @@ pub fn main() !void {
     const packetFromServer: ntp.Packet = ntp.parsePacket(buffer_in);
     ntp.print(packetFromServer);
 
+    // offset = [(T2 - T1) + (T3 - T4)] / 2
+    // delay = (T4 - T1) - (T3 - T2)
+
     // roundtrip delay = T(ABA) = (T4-T1) - (T3-T2)
     // result.delay = ;
 }

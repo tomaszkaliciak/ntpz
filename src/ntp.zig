@@ -1,4 +1,5 @@
 const std = @import("std");
+const testing = std.testing;
 
 const U16_SECOND_FRACTION_IN_MS = 0.01525878;
 const U32_SECOND_FRACTION_IN_MS = 0.00000023283064365386962890625;
@@ -24,7 +25,24 @@ pub const ShortTimestamp = extern struct { seconds: u16 = 0, fraction: u16 = 0 }
 pub const LongTimestamp = extern struct {
     seconds: u32 = 0,
     fraction: u32 = 0,
+
+    pub fn subtract(self: LongTimestamp, other: LongTimestamp) LongTimestamp {
+        var output = LongTimestamp{};
+        const x: u32 = self.seconds - other.seconds;
+        const y: u32 = self.fraction - other.fraction;
+        output.seconds = x;
+        output.fraction = y;
+        return output;
+    }
 };
+
+test "subtract" {
+    const t_1 = LongTimestamp{ .seconds = 1234, .fraction = 12 };
+    const t_2 = LongTimestamp{ .seconds = 1234, .fraction = 13 };
+    const expected = LongTimestamp{ .seconds = 0, .fraction = 1 };
+
+    try testing.expectEqual(t_1.subtract(t_2), expected);
+}
 
 pub fn toShortTimestamp(payload: u32) ShortTimestamp {
     var timestmap = ShortTimestamp{};
