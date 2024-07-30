@@ -33,6 +33,11 @@ pub const LongTimestamp = extern struct {
         const z = x - y;
         return LongTimestamp{ .seconds = @intCast(z >> 32), .fraction = @intCast(z & 0xFFFFFFFF) };
     }
+
+    pub fn toU64(self: LongTimestamp) u64 {
+        const x: u64 = @as(u64, self.seconds) << 32 | self.fraction;
+        return x;
+    }
 };
 
 test "subtract_simple" {
@@ -100,7 +105,7 @@ fn u16SecondFranctionToMs(fraction: f32) f32 {
     return U16_SECOND_FRACTION_IN_MS * fraction;
 }
 
-fn u32SecondFranctionToMs(fraction: f32) f32 {
+pub fn u32SecondFranctionToMs(fraction: f32) f32 {
     return U32_SECOND_FRACTION_IN_MS * fraction;
 }
 

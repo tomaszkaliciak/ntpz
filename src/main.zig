@@ -56,14 +56,23 @@ pub fn main() !void {
         buffer_in[0..recv_result],
     });
 
+    const ntpTimestampAfterMsg = ntp.toNtpTimestamp(std.time.nanoTimestamp());
+
     const packetFromServer: ntp.Packet = ntp.parsePacket(buffer_in);
     ntp.print(packetFromServer);
+
+    const t1 = packetFromServer.originTime;
+    const t2 = packetFromServer.receiveTime;
+    const t3 = packetFromServer.transmitTime;
+    const t4 = ntpTimestampAfterMsg;
 
     // offset = [(T2 - T1) + (T3 - T4)] / 2
     // delay = (T4 - T1) - (T3 - T2)
 
-    // roundtrip delay = T(ABA) = (T4-T1) - (T3-T2)
-    // result.delay = ;
+    const delay = (t4 - t1) - (t3 - t2);
+    const delayAsTimestamp = ntp.toLongTimestamp(delay);
+
+    std.debug.print("Delay {}s {} ms\n", .{ delayAsTimestamp.seconds, ntp.u32SecondFranctionToMs(@floatFromInt(delayAsTimestamp.fraction)) });
 }
 // fn printTimestamp(cTime: c.time_t) void {
 //     var buf: [200]u8 = undefined;
