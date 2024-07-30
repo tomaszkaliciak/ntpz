@@ -26,21 +26,20 @@ pub const LongTimestamp = extern struct {
     seconds: u32 = 0,
     fraction: u32 = 0,
 
+    // FIXME: overflow
     pub fn subtract(self: LongTimestamp, other: LongTimestamp) LongTimestamp {
-        var output = LongTimestamp{};
-        const x: u32 = self.seconds - other.seconds;
-        const y: u32 = self.fraction - other.fraction;
-        output.seconds = x;
-        output.fraction = y;
-        return output;
+        const x: u64 = @as(u64, self.seconds) << 32 | self.fraction;
+        const y: u64 = @as(u64, other.seconds) << 32 | other.fraction;
+        const z = x - y;
+        return LongTimestamp{ .seconds = @intCast(z >> 32), .fraction = @intCast(z & 0xFFFFFFFF) };
     }
 };
 
-test "subtract" {
-    const t_1 = LongTimestamp{ .seconds = 1234, .fraction = 12 };
-    const t_2 = LongTimestamp{ .seconds = 1234, .fraction = 13 };
-    const expected = LongTimestamp{ .seconds = 0, .fraction = 1 };
-
+test "subtract_simple" {
+    const t_1 = LongTimestamp{ .seconds = 1235, .fraction = 12 };
+    const t_2 = LongTimestamp{ .seconds = 1234, .fraction = 11 };
+    const expected = LongTimestamp{ .seconds = 1, .fraction = 1 };
+    std.debug.print("Result {b}\n", .{t_1.subtract(t_2).fraction});
     try testing.expectEqual(t_1.subtract(t_2), expected);
 }
 
